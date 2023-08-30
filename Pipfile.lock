@@ -147,11 +147,11 @@
         },
         "pywikibot": {
             "hashes": [
-                "sha256:6fe9d4c2496a485d5751ea8328d40d0ac9f52b50e3ae9ca4113b9176af92c4c0",
-                "sha256:c89b4da21ff5b0fdd2c7d4e6f12945bf8402cce298ea580d4d1693fd777ff9f4"
+                "sha256:13d540d0876c38d8dbf962ae74374300e8c2bef0694c17ebd8e93af1bb6c8e06",
+                "sha256:dec671b3ef9b8dcff1061878ae5e8d579ec25b9263db6e6b278139140870e083"
             ],
             "index": "pypi",
-            "version": "==8.3.1"
+            "version": "==8.3.2"
         },
         "requests": {
             "hashes": [
