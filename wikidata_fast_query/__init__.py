@@ -460,6 +460,9 @@ class MultiClaimContainer(ClaimMixin, Sequence[SingleClaimContainer]):
     def values(self) -> list[ClaimTargetValue]:
         return [claim.getTarget() for claim in self.claims]
 
+    def claim_values(self) -> Iterator[tuple[Claim, ClaimTargetValue]]:
+        yield from zip(self.claims, self.values)
+
     def first(self) -> Union[SingleClaimContainer, None]:
         return SingleClaimContainer(self.claims[0]) if self.claims else None
 
