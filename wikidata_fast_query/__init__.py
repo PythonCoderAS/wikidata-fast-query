@@ -1,12 +1,37 @@
 from abc import ABC, abstractmethod
 from typing import Iterator, Mapping, MutableMapping, Sequence, Union, overload
 
-from pywikibot import Claim, ItemPage, LexemePage, PropertyPage
+from pywikibot import (
+    Claim,
+    ItemPage,
+    LexemePage,
+    PropertyPage,
+    WbTime,
+    WbMonolingualText,
+    WbGeoShape,
+    WbQuantity,
+    WbTabularData,
+    WbUnknown,
+    Coordinate,
+)
 import pywikibot.page._collections
 
 from .dict_definition import PageDict
 
 Page = Union[ItemPage, PropertyPage, LexemePage]
+ClaimTargetValue = Union[
+    ItemPage,
+    PropertyPage,
+    LexemePage,
+    str,
+    WbMonolingualText,
+    WbGeoShape,
+    WbQuantity,
+    WbTabularData,
+    WbUnknown,
+    Coordinate,
+    WbTime,
+]
 
 
 class AbstractItemContainer(ABC):
@@ -428,11 +453,11 @@ class MultiClaimContainer(ClaimMixin, Sequence[SingleClaimContainer]):
     def __len__(self) -> int:
         return len(self.claims)
 
-    def __iter__(self):
-        return iter(self.claims)
+    def __iter__(self) -> Iterator[SingleClaimContainer]:
+        return map(SingleClaimContainer, self.claims)
 
     @property
-    def values(self) -> list:
+    def values(self) -> list[ClaimTargetValue]:
         return [claim.getTarget() for claim in self.claims]
 
     def first(self) -> Union[SingleClaimContainer, None]:
