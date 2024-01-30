@@ -404,7 +404,7 @@ class MultiReferenceClaimContainer(list["MultiClaimContainer"]):
         return f"{self.__class__.__qualname__}({super().__repr__()})"
 
 
-class MultiClaimContainer(ClaimMixin, Sequence[Claim]):
+class MultiClaimContainer(ClaimMixin, Sequence[SingleClaimContainer]):
     def __init__(self, claim_list: list[Claim]):
         self.claim_list = claim_list
 
@@ -413,7 +413,7 @@ class MultiClaimContainer(ClaimMixin, Sequence[Claim]):
         return self.claim_list
 
     @overload
-    def __getitem__(self, index: int) -> Claim:
+    def __getitem__(self, index: int) -> SingleClaimContainer:
         ...
 
     @overload
@@ -423,7 +423,7 @@ class MultiClaimContainer(ClaimMixin, Sequence[Claim]):
     def __getitem__(self, index: Union[int, slice]):
         if isinstance(index, slice):
             return MultiClaimContainer(self.claim_list[index])
-        return self.claim_list[index]
+        return SingleClaimContainer(self.claim_list[index])
 
     def __len__(self) -> int:
         return len(self.claims)
