@@ -4,14 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wikidata-fast-query"
-version = "1.0.0"
+version = "2.0.0"
 description = "A container class for easily navigating a Wikidata item."
 readme = "README.md"
-dependencies = [
-    "pywikibot"
-]
+dependencies = ["pywikibot"]
 requires-python = ">=3.9"
-license = {text = "MIT License"}
+license = { text = "MIT License" }
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
@@ -19,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: Implementation :: CPython",
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -26,7 +25,7 @@ classifiers = [
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Libraries :: Python Modules",
-    "Typing :: Typed"
+    "Typing :: Typed",
 ]
 
 [project.urls]
@@ -44,3 +43,18 @@ include = ["wikidata_fast_query*"]
 [tool.isort]
 profile = "black"
 skip_gitignore = true
+
+[tool.ruff.isort]
+combine-as-imports = true
+order-by-type = true
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.mypy]
+exclude = ["user-config.py", "user-password.py"]
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["pywikibot", "pywikibot.*"]
+ignore_missing_imports = true

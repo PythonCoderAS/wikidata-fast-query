@@ -1,14 +1,127 @@
 from abc import ABC, abstractmethod
-from typing import Mapping, MutableMapping, Sequence, Union, overload
+from typing import Iterator, Mapping, MutableMapping, Sequence, Union, overload
 
 from pywikibot import Claim, ItemPage, LexemePage, PropertyPage
+import pywikibot.page._collections
+
+from .dict_definition import PageDict
 
 Page = Union[ItemPage, PropertyPage, LexemePage]
 
 
-class ItemContainer:
+class AbstractItemContainer(ABC):
+    """An abstract class representing the data in an item."""
+
+    @overload
+    def labels(self, language: None = None) -> MutableMapping[str, str]:
+        ...
+
+    @overload
+    def labels(self, language: str) -> Union[str, None]:
+        ...
+
+    @abstractmethod
+    def labels(self, language: Union[str, None] = None):
+        """Get all labels for the item.
+
+        :param language: The language to get the labels for. If None, all labels are returned.
+        """
+
+    def label_languages(self) -> list[str]:
+        """Get all the languages that the item has labels in."""
+        return list(self.labels().keys())
+
+    @overload
+    def descriptions(self, language: None = None) -> MutableMapping[str, str]:
+        ...
+
+    @overload
+    def descriptions(self, language: str) -> Union[str, None]:
+        ...
+
+    @abstractmethod
+    def descriptions(self, language: Union[str, None] = None):
+        """Get all descriptions for the item.
+
+        :param language: The language to get the descriptions for. If None, all descriptions are returned.
+        """
+
+    def description_languages(self) -> list[str]:
+        """Get all the languages that the item has descriptions in."""
+        return list(self.descriptions().keys())
+
+    @overload
+    def aliases(self, language: None = None) -> MutableMapping[str, list[str]]:
+        ...
+
+    @overload
+    def aliases(self, language: str) -> list[str]:
+        ...
+
+    @abstractmethod
+    def aliases(self, language: Union[str, None] = None):
+        """Get all aliases for the item.
+
+        :param language: The language to get the aliases for. If None, all aliases are returned.
+        """
+
+    def alias_languages(self) -> list[str]:
+        """Get all the languages that the item has aliases in."""
+        return list(self.aliases().keys())
+
+    def alias_counts_by_language(self) -> dict[str, int]:
+        """Get the number of aliases in each language."""
+        return {k: len(v) for k, v in self.aliases().items()}
+
+    @overload
+    def all_titles(self, language: None = None) -> MutableMapping[str, list[str]]:
+        ...
+
+    @overload
+    def all_titles(self, language: str) -> list[str]:
+        ...
+
+    def all_titles(self, language: Union[str, None] = None):
+        """Get all titles for the item, with the label first.
+
+        .. note:: An item can have no label and more than zero aliases, so there is no garuntee that the first item
+            in the list is the label.
+        """
+        if language is not None:
+            return (
+                [self.labels(language)]
+                if self.labels(language)
+                else [] + self.aliases(language)
+            )
+        return {
+            k: [self.labels(k)] if self.labels(k) else [] + v
+            for k, v in self.aliases().items()
+        }
+
+    @overload
+    def claims(self, property: None = None) -> Mapping[str, "MultiClaimContainer"]:
+        ...
+
+    @overload
+    def claims(self, property: str) -> "MultiClaimContainer":
+        ...
+
+    @abstractmethod
+    def claims(self, property: Union[str, None] = None):
+        """Get all the claims for the item.
+
+        :param property: The property to get the claims for. If None, all claims are returned.
+        """
+
+
+class ItemContainer(AbstractItemContainer):
+    """A class representing the data in a :attr:`.Page` object."""
+
     def __init__(self, page: Page):
         self.page = page
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__qualname__}({self.page!r})"
 
     @overload
     def labels(self, language: None = None) -> MutableMapping[str, str]:
@@ -50,31 +163,6 @@ class ItemContainer:
         return self.page.aliases
 
     @overload
-    def all_titles(self, language: None = None) -> MutableMapping[str, list[str]]:
-        ...
-
-    @overload
-    def all_titles(self, language: str) -> list[str]:
-        ...
-
-    def all_titles(self, language: Union[str, None] = None):
-        """Get all titles for the item, with the label first.
-
-        .. note:: An item can have no label and more than zero aliases, so there is no garuntee that the first item
-            in the list is the label.
-        """
-        if language is not None:
-            return (
-                [self.labels(language)]
-                if self.labels(language)
-                else [] + self.aliases(language)
-            )
-        return {
-            k: [self.labels(k)] if self.labels(k) else [] + v
-            for k, v in self.aliases().items()
-        }
-
-    @overload
     def claims(self, property: None = None) -> Mapping[str, "MultiClaimContainer"]:
         ...
 
@@ -90,8 +178,75 @@ class ItemContainer:
             return MultiClaimContainer([])
         return {k: MultiClaimContainer(v) for k, v in self.page.claims.items()}
 
+
+class DictItemContainer(AbstractItemContainer):
+    def __init__(self, page_dict: PageDict, site=None):
+        self.page_dict = page_dict
+        site = site or pywikibot.Site("wikidata", "wikidata")
+        self._claim_container = pywikibot.page._collections.ClaimCollection.fromJSON(
+            page_dict["claims"], site
+        )
+        self.sitelinks = pywikibot.page._collections.SiteLinkCollection.fromJSON(
+            page_dict["sitelinks"], site
+        )
+
     def __repr__(self) -> str:
-        return f"{self.__class__.__qualname__}({self.page!r})"
+        return f"{self.__class__.__qualname__}({self.page_dict!r})"
+
+    @overload
+    def labels(self, language: None = None) -> MutableMapping[str, str]:
+        ...
+
+    @overload
+    def labels(self, language: str) -> Union[str, None]:
+        ...
+
+    def labels(self, language: Union[str, None] = None):
+        if language is not None:
+            return self.page_dict["labels"].get(language, None)
+        return self.page_dict["labels"]
+
+    @overload
+    def descriptions(self, language: None = None) -> MutableMapping[str, str]:
+        ...
+
+    @overload
+    def descriptions(self, language: str) -> Union[str, None]:
+        ...
+
+    def descriptions(self, language: Union[str, None] = None):
+        if language is not None:
+            return self.page_dict["descriptions"].get(language, None)
+        return self.page_dict["descriptions"]
+
+    @overload
+    def aliases(self, language: None = None) -> MutableMapping[str, list[str]]:
+        ...
+
+    @overload
+    def aliases(self, language: str) -> list[str]:
+        ...
+
+    def aliases(self, language: Union[str, None] = None):
+        if language is not None:
+            return self.page_dict["aliases"].get(language, [])
+        return self.page_dict["aliases"]
+
+    @overload
+    def claims(self, property: None = None) -> Mapping[str, "MultiClaimContainer"]:
+        ...
+
+    @overload
+    def claims(self, property: str) -> "MultiClaimContainer":
+        ...
+
+    def claims(self, property: Union[str, None] = None):
+        if property is not None:
+            val = self._claim_container.get(property, None)
+            if val:
+                return MultiClaimContainer(val)
+            return MultiClaimContainer([])
+        return {k: MultiClaimContainer(v) for k, v in self._claim_container.items()}
 
 
 class ClaimMixin(ABC):
@@ -160,18 +315,28 @@ class SingleReferenceContainer:
         return f"{self.__class__.__qualname__}({self.reference_group!r})"
 
 
-class MultiReferenceContainer(Sequence[MutableMapping[str, list[Claim]]]):
+class MultiReferenceContainer(Sequence[SingleReferenceContainer]):
     def __init__(self, reference_groups: list[MutableMapping[str, list[Claim]]]):
         self.reference_groups = reference_groups
 
+    @overload
     def __getitem__(self, index: int) -> SingleReferenceContainer:
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> "MultiReferenceContainer":
+        ...
+
+    def __getitem__(self, index: Union[int, slice]):
+        if isinstance(index, slice):
+            return MultiReferenceContainer(self.reference_groups[index])
         return SingleReferenceContainer(self.reference_groups[index])
 
     def __len__(self) -> int:
         return len(self.reference_groups)
 
-    def __iter__(self):
-        return iter(self.reference_groups)
+    def __iter__(self) -> Iterator[SingleReferenceContainer]:
+        return map(SingleReferenceContainer, self.reference_groups)
 
     def first(self) -> Union[SingleReferenceContainer, None]:
         return (
@@ -247,8 +412,18 @@ class MultiClaimContainer(ClaimMixin, Sequence[Claim]):
     def claims(self) -> list[Claim]:
         return self.claim_list
 
+    @overload
     def __getitem__(self, index: int) -> Claim:
-        return self.claims[index]
+        ...
+
+    @overload
+    def __getitem__(self, index: slice) -> "MultiClaimContainer":
+        ...
+
+    def __getitem__(self, index: Union[int, slice]):
+        if isinstance(index, slice):
+            return MultiClaimContainer(self.claim_list[index])
+        return self.claim_list[index]
 
     def __len__(self) -> int:
         return len(self.claims)
@@ -329,11 +504,11 @@ class MultiClaimMultiReferenceContainer(list[MultiReferenceContainer]):
         """Get the references of the last claim in the list of claims."""
         return self[-1] if self else None
 
-    def first(self) -> list[Union[SingleClaimContainer, None]]:
+    def first(self) -> list[Union[SingleReferenceContainer, None]]:
         """Get the first reference of each claim in the list of claims."""
         return [claim.first() for claim in self]
 
-    def last(self) -> list[Union[SingleClaimContainer, None]]:
+    def last(self) -> list[Union[SingleReferenceContainer, None]]:
         """Get the last reference of each claim in the list of claims."""
         return [claim.last() for claim in self]
 
