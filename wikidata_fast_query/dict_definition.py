@@ -1,4 +1,4 @@
-from typing import TypedDict, TypeVar, Generic
+from typing_extensions import TypedDict, TypeVar, Generic
 
 LanguageCode = TypeVar("LanguageCode")
 
