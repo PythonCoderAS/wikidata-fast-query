@@ -29,13 +29,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Python 3.9
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: "3.12"
       - run: pip install --upgrade pipenv
       - run: pipenv sync --dev
-      - run: |
+      - name: Build Docs
+        run: |
           cd docs
           pipenv run make html
           cd ..
