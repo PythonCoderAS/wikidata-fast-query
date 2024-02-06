@@ -68,7 +68,7 @@ jobs:
           USER_PASSWORD: ${{ secrets.USER_PASSWORD }}
 
       - name: Test
-        run: python -m pytest --simulate
+        run: python -m pytest
 
       - name: Upload coverage
         uses: coverallsapp/github-action@v2
