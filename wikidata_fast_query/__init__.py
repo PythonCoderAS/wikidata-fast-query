@@ -16,7 +16,7 @@ from pywikibot import (
 )
 import pywikibot.page._collections
 
-from .dict_definition import PageDict
+from .dict_definition import LanguageDict, PageDict
 
 Page = Union[ItemPage, PropertyPage, LexemePage]
 ClaimTargetValue = Union[
@@ -38,15 +38,19 @@ class AbstractItemContainer(ABC):
     """An abstract class representing the data in an item."""
 
     @overload
+    @abstractmethod
     def labels(self, language: None = None) -> MutableMapping[str, str]:
         ...
 
     @overload
+    @abstractmethod
     def labels(self, language: str) -> Union[str, None]:
         ...
 
     @abstractmethod
-    def labels(self, language: Union[str, None] = None):
+    def labels(
+        self, language: Union[str, None] = None
+    ) -> Union[str, MutableMapping[str, str], None]:
         """Get all labels for the item.
 
         :param language: The language to get the labels for. If None, all labels are returned.
@@ -57,15 +61,19 @@ class AbstractItemContainer(ABC):
         return list(self.labels().keys())
 
     @overload
+    @abstractmethod
     def descriptions(self, language: None = None) -> MutableMapping[str, str]:
         ...
 
     @overload
+    @abstractmethod
     def descriptions(self, language: str) -> Union[str, None]:
         ...
 
     @abstractmethod
-    def descriptions(self, language: Union[str, None] = None):
+    def descriptions(
+        self, language: Union[str, None] = None
+    ) -> Union[str, MutableMapping[str, str], None]:
         """Get all descriptions for the item.
 
         :param language: The language to get the descriptions for. If None, all descriptions are returned.
@@ -76,15 +84,19 @@ class AbstractItemContainer(ABC):
         return list(self.descriptions().keys())
 
     @overload
+    @abstractmethod
     def aliases(self, language: None = None) -> MutableMapping[str, list[str]]:
         ...
 
     @overload
+    @abstractmethod
     def aliases(self, language: str) -> list[str]:
         ...
 
     @abstractmethod
-    def aliases(self, language: Union[str, None] = None):
+    def aliases(
+        self, language: Union[str, None] = None
+    ) -> Union[MutableMapping[str, list[str]], list[str]]:
         """Get all aliases for the item.
 
         :param language: The language to get the aliases for. If None, all aliases are returned.
@@ -106,33 +118,38 @@ class AbstractItemContainer(ABC):
     def all_titles(self, language: str) -> list[str]:
         ...
 
-    def all_titles(self, language: Union[str, None] = None):
+    def all_titles(
+        self, language: Union[str, None] = None
+    ) -> Union[MutableMapping[str, list[str]], list[str]]:
         """Get all titles for the item, with the label first.
 
         .. note:: An item can have no label and more than zero aliases, so there is no garuntee that the first item
             in the list is the label.
         """
         if language is not None:
-            return (
-                [self.labels(language)]
-                if self.labels(language)
-                else [] + self.aliases(language)
-            )
+            items = self.aliases(language)
+            if label := self.labels(language):
+                items.insert(0, label)
+            return items
         return {
-            k: [self.labels(k)] if self.labels(k) else [] + v
-            for k, v in self.aliases().items()
+            lang: self.all_titles(lang)
+            for lang in set(self.label_languages()).union(self.alias_languages())
         }
 
     @overload
+    @abstractmethod
     def claims(self, property: None = None) -> Mapping[str, "MultiClaimContainer"]:
         ...
 
     @overload
+    @abstractmethod
     def claims(self, property: str) -> "MultiClaimContainer":
         ...
 
     @abstractmethod
-    def claims(self, property: Union[str, None] = None):
+    def claims(
+        self, property: Union[str, None] = None
+    ) -> Union[Mapping[str, "MultiClaimContainer"], "MultiClaimContainer"]:
         """Get all the claims for the item.
 
         :param property: The property to get the claims for. If None, all claims are returned.
@@ -195,7 +212,9 @@ class ItemContainer(AbstractItemContainer):
     def claims(self, property: str) -> "MultiClaimContainer":
         ...
 
-    def claims(self, property: Union[str, None] = None):
+    def claims(
+        self, property: Union[str, None] = None
+    ) -> Union[Mapping[str, "MultiClaimContainer"], "MultiClaimContainer"]:
         if property is not None:
             val = self.page.claims.get(property, None)
             if val:
@@ -219,6 +238,24 @@ class DictItemContainer(AbstractItemContainer):
         return f"{self.__class__.__qualname__}({self.page_dict!r})"
 
     @overload
+    @staticmethod
+    def extract_from_language_dict(item: LanguageDict[str]) -> str:
+        ...
+
+    @overload
+    @staticmethod
+    def extract_from_language_dict(item: None) -> None:
+        ...
+
+    @staticmethod
+    def extract_from_language_dict(
+        item: Union[LanguageDict[str], None],
+    ) -> Union[str, None]:
+        if item is not None:
+            return item["value"]
+        return None
+
+    @overload
     def labels(self, language: None = None) -> MutableMapping[str, str]:
         ...
 
@@ -226,10 +263,18 @@ class DictItemContainer(AbstractItemContainer):
     def labels(self, language: str) -> Union[str, None]:
         ...
 
-    def labels(self, language: Union[str, None] = None):
+    def labels(
+        self, language: Union[str, None] = None
+    ) -> Union[str, MutableMapping[str, str], None]:
         if language is not None:
-            return self.page_dict["labels"].get(language, None)
-        return self.page_dict["labels"]
+            return self.extract_from_language_dict(
+                self.page_dict["labels"].get(language, None)
+            )
+        return {
+            lang: value["value"]
+            for lang, value in self.page_dict["labels"].items()
+            if value
+        }
 
     @overload
     def descriptions(self, language: None = None) -> MutableMapping[str, str]:
@@ -239,10 +284,18 @@ class DictItemContainer(AbstractItemContainer):
     def descriptions(self, language: str) -> Union[str, None]:
         ...
 
-    def descriptions(self, language: Union[str, None] = None):
+    def descriptions(
+        self, language: Union[str, None] = None
+    ) -> Union[str, MutableMapping[str, str], None]:
         if language is not None:
-            return self.page_dict["descriptions"].get(language, None)
-        return self.page_dict["descriptions"]
+            return self.extract_from_language_dict(
+                self.page_dict["descriptions"].get(language, None)
+            )
+        return {
+            lang: value["value"]
+            for lang, value in self.page_dict["descriptions"].items()
+            if value
+        }
 
     @overload
     def aliases(self, language: None = None) -> MutableMapping[str, list[str]]:
@@ -252,10 +305,18 @@ class DictItemContainer(AbstractItemContainer):
     def aliases(self, language: str) -> list[str]:
         ...
 
-    def aliases(self, language: Union[str, None] = None):
+    def aliases(
+        self, language: Union[str, None] = None
+    ) -> Union[MutableMapping[str, list[str]], list[str]]:
         if language is not None:
-            return self.page_dict["aliases"].get(language, [])
-        return self.page_dict["aliases"]
+            return [
+                self.extract_from_language_dict(item)
+                for item in self.page_dict["aliases"].get(language, [])
+            ]
+        return {
+            lang: [self.extract_from_language_dict(item) for item in value]
+            for lang, value in self.page_dict["aliases"].items()
+        }
 
     @overload
     def claims(self, property: None = None) -> Mapping[str, "MultiClaimContainer"]:
@@ -265,7 +326,9 @@ class DictItemContainer(AbstractItemContainer):
     def claims(self, property: str) -> "MultiClaimContainer":
         ...
 
-    def claims(self, property: Union[str, None] = None):
+    def claims(
+        self, property: Union[str, None] = None
+    ) -> Union[Mapping[str, "MultiClaimContainer"], "MultiClaimContainer"]:
         if property is not None:
             val = self._claim_container.get(property, None)
             if val:
@@ -301,7 +364,9 @@ class SingleClaimContainer(ClaimMixin):
     def qualifiers(self, property: str) -> "MultiClaimContainer":
         ...
 
-    def qualifiers(self, property: Union[str, None] = None):
+    def qualifiers(
+        self, property: Union[str, None] = None
+    ) -> Union[Mapping[str, "MultiClaimContainer"], "MultiClaimContainer"]:
         if property is not None:
             val = self.claim.qualifiers.get(property, None)
             if val:
@@ -328,7 +393,9 @@ class SingleReferenceContainer:
     def claims(self, property: str) -> "MultiClaimContainer":
         ...
 
-    def claims(self, property: Union[str, None] = None):
+    def claims(
+        self, property: Union[str, None] = None
+    ) -> Union[Mapping[str, "MultiClaimContainer"], "MultiClaimContainer"]:
         if property is not None:
             val = self.reference_group.get(property, None)
             if val:
@@ -458,7 +525,7 @@ class MultiClaimContainer(ClaimMixin, Sequence[SingleClaimContainer]):
 
     @property
     def values(self) -> list[ClaimTargetValue]:
-        return [claim.getTarget() for claim in self.claims]
+        return [claim.getTarget() for claim in self.claims]  # type: ignore # pywikibot does not have full typing yet
 
     def claim_values(self) -> Iterator[tuple[Claim, ClaimTargetValue]]:
         yield from zip(self.claims, self.values)
